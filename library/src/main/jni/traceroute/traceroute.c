@@ -1,6 +1,6 @@
 /*
     Copyright (c)  2006, 2007		Dmitry Butskoy
-					<buc@citadel.stu.neva.ru>
+					<dmitry@butskoy.name>
     License:  GPL v2 or any later
 
     See COPYING for the status of this software.
@@ -13,10 +13,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <poll.h>
-//#include <netinet/icmp6.h>
-
-#include "libsupp/icmp6.h"
-
+#include <netinet/icmp6.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -26,10 +23,10 @@
 #include <sys/utsname.h>
 #include <linux/types.h>
 #include <linux/errqueue.h>
+#include <string.h>
 
-#include <linux/icmp.h>
 /*  XXX: Remove this when things will be defined properly in netinet/ ...  */
-//#include "flowlabel.h"
+#include "flowlabel.h"
 
 #include "libsupp/clif.h"
 #include "include/version.h"
@@ -81,9 +78,6 @@
 #define DEF_SEND_SECS	0
 #define DEF_DATA_LEN	40	/*  all but IP header...  */
 #define MAX_PACKET_LEN	65000
-#ifndef DEF_AF
-#define DEF_AF		AF_INET
-#endif
 
 #define ttl2hops(X)	(((X) <= 64 ? 65 : ((X) <= 128 ? 129 : 256)) - (X))
 
@@ -152,7 +146,7 @@ static void ex_error (const char *format, ...) {
 
 	fprintf (stderr, "\n");
 
-    exit(2);
+	exit (2);
 }
 
 void error (const char *str) {
@@ -161,7 +155,7 @@ void error (const char *str) {
 
 	perror (str);
 
-    exit(1);
+	exit (1);
 }
 
 void error_or_perm (const char *str) {
@@ -170,6 +164,20 @@ void error_or_perm (const char *str) {
 		fprintf (stderr, "You do not have enough privileges to use "
 				"this traceroute method.");
 	error (str);
+}
+
+
+void put_err (probe *pb, const char *format, ...) {
+	va_list ap;
+	char *curr = pb->err_str;
+	char *end = pb->err_str + sizeof (pb->err_str) - 1;
+
+	/*  It can already contain something when `--mtu' or `-T -O mss'   */
+	while (curr < end && *curr)  curr++;
+
+	va_start (ap, format);
+	vsnprintf (curr, end - curr, format, ap);
+	va_end (ap);
 }
 
 
@@ -214,9 +222,7 @@ static int getaddr (const char *name, sockaddr_any *addr) {
 	}
 
 	for (ai = res; ai; ai = ai->ai_next) {
-	    if (ai->ai_family == af)  break;
-	    /*  when af not specified, choose DEF_AF if present   */
-	    if (!af && ai->ai_family == DEF_AF)
+	    if (!af || ai->ai_family == af)
 		    break;
 	}
 	if (!ai)  ai = res;	/*  anything...  */
@@ -226,6 +232,15 @@ static int getaddr (const char *name, sockaddr_any *addr) {
 	memcpy (addr, ai->ai_addr, ai->ai_addrlen);
 
 	freeaddrinfo (res);
+
+	/*  No v4mapped addresses in real network, interpret it as ipv4 anyway   */
+	if (addr->sa.sa_family == AF_INET6 &&
+	    IN6_IS_ADDR_V4MAPPED (&addr->sin6.sin6_addr)
+	) {
+	    if (af == AF_INET6)  return -1;
+	    addr->sa.sa_family = AF_INET;
+	    addr->sin.sin_addr.s_addr = addr->sin6.sin6_addr.s6_addr32[3];
+	}
 
 	return 0;
 }
@@ -254,7 +269,7 @@ static void make_fd_used (int fd) {
 
 static char addr2str_buf[INET6_ADDRSTRLEN];
 
-static const char *addr2str (const sockaddr_any *addr) {
+const char *addr2str (const sockaddr_any *addr) {
 
 	getnameinfo (&addr->sa, sizeof (*addr),
 		addr2str_buf, sizeof (addr2str_buf), 0, 0, NI_NUMERICHOST);
@@ -422,8 +437,8 @@ static int set_mod_option (CLIF_option *optn, char *arg) {
 	    } else
 		fprintf (stderr, "No options for module `%s'\n", module);
 
-        exit(0);
-    }
+	    exit (0);
+	}
 
 	if (opts_idx >= sizeof (opts) / sizeof (*opts))  {
 	    fprintf (stderr, "Too many module options\n");
@@ -607,20 +622,21 @@ static CLIF_argument arg_list[] = {
 };
 
 
-static void do_it(void);
+static void do_it (void);
 
 int exec(int argc, char *argv[]) {
 //int main (int argc, char *argv[]) {
 
-    setlocale(LC_ALL, "");
-    setlocale(LC_NUMERIC, "C");    /*  avoid commas in msec printed  */
+	setlocale (LC_ALL, "");
+	setlocale (LC_NUMERIC, "C");	/*  avoid commas in msec printed  */
 
-    check_progname(argv[0]);
+	check_progname (argv[0]);
 
-    if (CLIF_parse(argc, argv, option_list, arg_list,
-                   CLIF_MAY_JOIN_ARG | CLIF_HELP_EMPTY) < 0) {
-        exit(2);
-    }
+
+	if (CLIF_parse (argc, argv, option_list, arg_list,
+				CLIF_MAY_JOIN_ARG | CLIF_HELP_EMPTY) < 0
+	)  exit (2);
+
 
 	ops = tr_get_module (module);
 	if (!ops)  ex_error ("Unknown traceroute module %s", module);
@@ -692,15 +708,15 @@ int exec(int argc, char *argv[]) {
 	if (!probes)  error ("calloc");
 
 
-    if (ops->options && opts_idx > 1) {
-        opts[0] = strdup(module);        /*  aka argv[0] ...  */
-        if (CLIF_parse(opts_idx, opts, ops->options, 0, CLIF_KEYWORD) < 0) {
-            exit(2);
-        }
-    }
+	if (ops->options && opts_idx > 1) {
+	    opts[0] = strdup (module);	    /*  aka argv[0] ...  */
+	    if (CLIF_parse (opts_idx, opts, ops->options, 0, CLIF_KEYWORD) < 0)
+		    exit (2);
+	}
 
 	if (ops->init (&dst_addr, dst_port_seq, &data_len) < 0)
 		ex_error ("trace method's init failed");
+
 
 	do_it ();
 
@@ -1221,8 +1237,6 @@ void tune_socket (int sk) {
 
 
 void parse_icmp_res (probe *pb, int type, int code, int info) {
-	char *str = NULL;
-	char buf[sizeof (pb->err_str)];
 
 	if (af == AF_INET) {
 
@@ -1230,60 +1244,60 @@ void parse_icmp_res (probe *pb, int type, int code, int info) {
 		if (code == ICMP_EXC_TTL)
 			return;
 	    }
-	    else if (type == ICMP_DEST_UNREACH) {
+
+	    if (type == ICMP_DEST_UNREACH) {
 
 		switch (code) {
 		    case ICMP_UNREACH_NET:
 		    case ICMP_UNREACH_NET_UNKNOWN:
 		    case ICMP_UNREACH_ISOLATED:
 		    case ICMP_UNREACH_TOSNET:
-			    str = "!N";
+			    put_err (pb, "!N");
 			    break;
 
 		    case ICMP_UNREACH_HOST:
 		    case ICMP_UNREACH_HOST_UNKNOWN:
 		    case ICMP_UNREACH_TOSHOST:
-			    str = "!H";
+			    put_err (pb, "!H");
 			    break;
 
 		    case ICMP_UNREACH_NET_PROHIB:
 		    case ICMP_UNREACH_HOST_PROHIB:
 		    case ICMP_UNREACH_FILTER_PROHIB:
-			    str = "!X";
+			    put_err (pb, "!X");
 			    break;
 
 		    case ICMP_UNREACH_PORT:
 			    /*  dest host is reached   */
-			    str = "";
 			    break;
 
 		    case ICMP_UNREACH_PROTOCOL:
-			    str = "!P";
+			    put_err (pb, "!P");
 			    break;
 
 		    case ICMP_UNREACH_NEEDFRAG:
-			    snprintf (buf, sizeof (buf), "!F-%d", info);
-			    str = buf;
+			    put_err (pb, "!F-%d", info);
 			    break;
 
 		    case ICMP_UNREACH_SRCFAIL:
-			    str = "!S";
+			    put_err (pb, "!S");
 			    break;
 
 		    case ICMP_UNREACH_HOST_PRECEDENCE:
-			    str = "!V";
+			    put_err (pb, "!V");
 			    break;
 
 		    case ICMP_UNREACH_PRECEDENCE_CUTOFF:
-			    str = "!C";
+			    put_err (pb, "!C");
 			    break;
 
 		    default:
-			    snprintf (buf, sizeof (buf), "!<%u>", code);
-			    str = buf;
+			    put_err (pb, "!<%u>", code);
 			    break;
 		}
-	    }
+
+	    } else
+		put_err (pb, "!<%u-%u>", type, code);
 
 	}
 	else if (af == AF_INET6) {
@@ -1292,49 +1306,37 @@ void parse_icmp_res (probe *pb, int type, int code, int info) {
 		if (code == ICMP6_TIME_EXCEED_TRANSIT)
 			return;
 	    }
-	    else if (type == ICMP6_DST_UNREACH) {
+
+	    if (type == ICMP6_DST_UNREACH) {
 
 		switch (code) {
 
 		    case ICMP6_DST_UNREACH_NOROUTE:
-			    str = "!N";
+			    put_err (pb, "!N");
 			    break;
 
 		    case ICMP6_DST_UNREACH_BEYONDSCOPE:
 		    case ICMP6_DST_UNREACH_ADDR:
-			    str = "!H";
+			    put_err (pb, "!H");
 			    break;
 
 		    case ICMP6_DST_UNREACH_ADMIN:
-			    str = "!X";
+			    put_err (pb, "!X");
 			    break;
 
 		    case ICMP6_DST_UNREACH_NOPORT:
 			    /*  dest host is reached   */
-			    str = "";
 			    break;
 
 		    default:
-			    snprintf (buf, sizeof (buf), "!<%u>", code);
-			    str = buf;
+			    put_err (pb, "!<%u>", code);
 			    break;
 		}
 	    }
-	    else if (type == ICMP6_PACKET_TOO_BIG) {
-		snprintf (buf, sizeof (buf), "!F-%d", info);
-		str = buf;
-	    }
-	}
-
-
-	if (!str) {
-	    snprintf (buf, sizeof (buf), "!<%u-%u>", type, code);
-	    str = buf;
-	}
-
-	if (*str) {
-	    strncpy (pb->err_str, str, sizeof (pb->err_str));
-	    pb->err_str[sizeof (pb->err_str) - 1] = '\0';
+	    else if (type == ICMP6_PACKET_TOO_BIG)
+		    put_err (pb, "!F-%d", info);
+	    else
+		put_err (pb, "!<%u-%u>", type, code);
 	}
 
 	pb->final = 1;
@@ -1346,7 +1348,7 @@ void parse_icmp_res (probe *pb, int type, int code, int info) {
 static void parse_local_res (probe *pb, int ee_errno, int info) {
 
 	if (ee_errno == EMSGSIZE && info != 0) {
-	    snprintf (pb->err_str, sizeof(pb->err_str)-1, "!F-%d", info);
+	    put_err (pb, "!F-%d", info);
 	    pb->final = 1;
 	    return;
 	}
@@ -1518,7 +1520,7 @@ void recv_reply (int sk, int err, check_reply_t check_reply) {
 	      but fill its `err_str' by the info obtained. Ugly, but easy...
 	    */
 	    memset (pb, 0, sizeof (*pb));
-	    snprintf (pb->err_str, sizeof(pb->err_str)-1, "F=%d", ee->ee_info);
+	    put_err (pb, "F=%d", ee->ee_info);
 
 	    return;
 	}
@@ -1649,7 +1651,7 @@ int do_send (int sk, const void *data, size_t len, const sockaddr_any *addr) {
 	if (res < 0) {
 	    if (errno == ENOBUFS || errno == EAGAIN)
 		    return res;
-	    if (errno == EMSGSIZE)
+	    if (errno == EMSGSIZE || errno == EHOSTUNREACH)
 		    return 0;	/*  recverr will say more...  */
 	    error ("send");	/*  not recoverable   */
 	}

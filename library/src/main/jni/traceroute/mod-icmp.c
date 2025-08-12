@@ -1,6 +1,6 @@
 /*
     Copyright (c)  2006, 2007		Dmitry Butskoy
-					<buc@citadel.stu.neva.ru>
+					<dmitry@butskoy.name>
     License:  GPL v2 or any later
 
     See COPYING for the status of this software.
@@ -15,8 +15,6 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
-
-#include <linux/icmp.h>
 
 #include "traceroute.h"
 

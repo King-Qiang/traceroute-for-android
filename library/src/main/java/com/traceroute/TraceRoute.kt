@@ -1,7 +1,8 @@
-package com.wandroid.traceroute
+package com.traceroute
 
 import android.os.Handler
 import android.os.Looper
+import java.net.InetAddress
 
 /**
  * traceroute on android with JNI.
@@ -35,7 +36,7 @@ object TraceRoute {
      * @param callback The callback that will run
      */
     fun setCallback(callback: TraceRouteCallback?) {
-        this.callback = callback
+        TraceRoute.callback = callback
     }
 
     /**
@@ -72,7 +73,7 @@ object TraceRoute {
     }
 
     /**
-     * traceroute with hostname
+     * traceroute with hostname "-I" --- ICMP发包. "-T" --- TCP发包. 默认 --- UDP发包
      *
      * @param hostname traceroute's hostname
      * @param async synchronous or asynchronous execution
@@ -80,7 +81,7 @@ object TraceRoute {
      */
     @Synchronized
     fun traceRoute(hostname: String, async: Boolean = false): TraceRouteResult? {
-        val args = arrayOf("traceroute", hostname)
+        val args = arrayOf("traceroute", "-I", hostname)
         if (async) {
             Thread({
                 traceRoute(args)
@@ -100,17 +101,42 @@ object TraceRoute {
     @Synchronized
     fun traceRoute(args: Array<String>): TraceRouteResult {
         val traceRouteResult = TraceRouteResult.instance()
+        traceRouteResult.toHost = args[args.size - 1]
+        traceRouteResult.protocol = "ICMP"
+        traceRouteResult.moduleVer = "1.1"
+        traceRouteResult.startTime = System.currentTimeMillis()
+        traceRouteResult.targetIP = getTargetIP(traceRouteResult.toHost)
         traceRouteResult.code = execute(args)
         if (traceRouteResult.code == 0) {
-            traceRouteResult.message = result.toString()
+            traceRouteResult.detail = result.toString()
             handler.post { callback?.onSuccess(traceRouteResult) }
         } else {
-            traceRouteResult.message = "execute traceroute failed."
+            traceRouteResult.detail = "execute traceroute failed."
             handler.post {
-                callback?.onFailed(traceRouteResult.code, traceRouteResult.message)
+                callback?.onFailed(traceRouteResult.code, traceRouteResult.detail)
             }
         }
+        traceRouteResult.domainTime = System.currentTimeMillis() - traceRouteResult.startTime
         return traceRouteResult
+    }
+
+    /**
+     * 通过域名获取目标IP地址
+     *
+     * @param hostname 域名
+     * @return IP地址，如果解析失败则返回null
+     */
+    fun getTargetIP(hostname: String): String {
+        return try {
+            val addresses = InetAddress.getAllByName(hostname)
+            if (addresses.isNotEmpty()) {
+                addresses[0].hostAddress
+            } else {
+                ""
+            }
+        } catch (e: Exception) {
+            ""
+        }
     }
 
     /**
@@ -123,18 +149,18 @@ object TraceRoute {
 
 }
 
-/**
- * TracerouteResult data class
- */
-data class TraceRouteResult(var code: Int, var message: String) {
-
-    companion object {
-
-        fun instance(): TraceRouteResult = TraceRouteResult(-1, "")
-
-    }
-
-}
+///**
+// * TracerouteResult data class
+// */
+//data class TraceRouteResult(var code: Int, var message: String) {
+//
+//    companion object {
+//
+//        fun instance(): TraceRouteResult = TraceRouteResult(-1, "")
+//
+//    }
+//
+//}
 
 /**
  * traceroute callback

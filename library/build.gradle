@@ -1,20 +1,21 @@
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
-apply plugin: 'com.novoda.bintray-release'
+//apply plugin: 'com.novoda.bintray-release'
 apply plugin: 'org.jetbrains.dokka-android'
 
 android {
-    compileSdkVersion 27
+    namespace "com.traceroute"
+    compileSdkVersion 34
 
     defaultConfig {
-        minSdkVersion 16
-        targetSdkVersion 27
+        minSdkVersion 21
+        targetSdkVersion 35
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
         ndk {
-            abiFilters 'armeabi', 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
         }
     }
 
@@ -30,6 +31,17 @@ android {
         }
     }
 
+    // 添加Kotlin编译选项
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    // 明确指定Kotlin JVM目标版本
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
 }
 
 dependencies {
@@ -40,11 +52,11 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }
 
-task generateSourcesJar(type: Jar) {
-    group = 'jar'
-    from android.sourceSets.main.java.srcDirs
-    classifier = 'sources'
-}
+//task generateSourcesJar(type: Jar) {
+//    group = 'jar'
+//    from android.sourceSets.main.java.srcDirs
+//    classifier = 'sources'
+//}
 
 task javadoc(type: Javadoc) {
     source = android.sourceSets.main.java.srcDirs
@@ -56,22 +68,22 @@ task dokkaJavadoc(type: org.jetbrains.dokka.gradle.DokkaTask) {
     outputDirectory = javadoc.destinationDir
 }
 
-task generateJavadoc(type: Jar, dependsOn: dokkaJavadoc) {
-    group = 'jar'
-    classifier = 'javadoc'
-    from javadoc.destinationDir
-}
+//task generateJavadoc(type: Jar, dependsOn: dokkaJavadoc) {
+//    group = 'jar'
+//    classifier = 'javadoc'
+//    from javadoc.destinationDir
+//}
 
-artifacts {
-    archives generateJavadoc
-    archives generateSourcesJar
-}
+//artifacts {
+//    archives generateJavadoc
+//    archives generateSourcesJar
+//}
 
-publish {
-    userOrg = 'angelwangjing'
-    groupId = 'com.wandroid'
-    artifactId = 'traceroute-for-android'
-    publishVersion = '1.0.1'
-    desc = 'traceroute with jni on android'
-    website = 'https://github.com/wangjing53406/traceroute-for-android'
-}
+//publish {
+//    userOrg = 'angelwangjing'
+//    groupId = 'com.wandroid'
+//    artifactId = 'traceroute-for-android'
+//    publishVersion = '1.0.1'
+//    desc = 'traceroute with jni on android'
+//    website = 'https://github.com/wangjing53406/traceroute-for-android'
+//}

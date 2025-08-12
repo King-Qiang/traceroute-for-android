@@ -1,6 +1,6 @@
 /*
     Copyright (c)  2006, 2007		Dmitry Butskoy
-					<buc@citadel.stu.neva.ru>
+					<dmitry@butskoy.name>
     License:  GPL v2 or any later
 
     See COPYING for the status of this software.
@@ -10,9 +10,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <poll.h>
-//#include <netinet/icmp6.h>
-
-#include "libsupp/icmp6.h"    
+#include <netinet/icmp6.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>

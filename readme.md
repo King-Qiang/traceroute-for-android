@@ -47,3 +47,8 @@ TraceRoute.traceRoute("www.google.com", true)
 ```
 
 get executable file from [traceroute-android-executable](https://github.com/wangjing53406/traceroute-android-executable)
+
+## 适配16KB
+1. 新增Android 16KB模式的适配
+参考文档：[Android 支持 16 KB 的页面大小](https://developer.android.google.cn/guide/practices/page-sizes?hl=zh-cn#check-code)
+2. 升级Traceroute for Linux版本为2.1.6，[官网链接](https://sourceforge.net/projects/traceroute/files/traceroute/)

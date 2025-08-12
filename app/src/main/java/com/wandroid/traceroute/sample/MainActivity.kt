@@ -5,7 +5,10 @@ import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.AppCompatButton
 import android.support.v7.widget.AppCompatEditText
 import android.support.v7.widget.AppCompatTextView
-import com.wandroid.traceroute.TraceRoute
+import com.traceroute.TraceRoute
+import com.traceroute.TraceRouteResult
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -44,11 +47,26 @@ class MainActivity : AppCompatActivity() {
 //            }
 //        })
         TraceRoute.setCallback {
-            success { result.append("\ntraceroute finish") }
+            success { result.append(getTraceRouteDetail(it)) }
             update { text -> result.append(text) }
             failed { code, reason -> result.append("""\ntraceroute failed.code:$code, reason:$reason""") }
         }
         TraceRoute.traceRoute(text.text.toString(), true)
+    }
+
+    private fun getTraceRouteDetail(traceRouteResult: TraceRouteResult): String {
+        val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        val traceProd = StringBuilder()
+        traceProd.append("\n{")
+            .append("moduleVer='").append(traceRouteResult.moduleVer).append("'")
+            .append(", protocol='").append(traceRouteResult.protocol).append("'")
+            .append(", toHost='").append(traceRouteResult.toHost).append("'")
+            .append(", startTime='").append(formatter.format(traceRouteResult.startTime)).append("'")
+            .append(", domainTime='").append(traceRouteResult.domainTime).append("'")
+            .append(", targetIP='").append(traceRouteResult.targetIP).append("'")
+            .append(", detail=").append(traceRouteResult.detail)
+            .append('}')
+        return traceProd.toString()
     }
 
 }
