@@ -113,7 +113,7 @@ object TraceRoute {
         } else {
             traceRouteResult.detail = "execute traceroute failed."
             handler.post {
-                callback?.onFailed(traceRouteResult.code, traceRouteResult.detail)
+                callback?.onFailed(traceRouteResult.code, traceRouteResult.toHost, traceRouteResult.protocol, traceRouteResult.detail)
             }
         }
         traceRouteResult.domainTime = System.currentTimeMillis() - traceRouteResult.startTime
@@ -187,7 +187,7 @@ interface TraceRouteCallback {
      * @param code execute code. Nonzero is failure
      * @param reason Failure explanation
      */
-    fun onFailed(code: Int, reason: String)
+    fun onFailed(code: Int, host: String, protocol: String, reason: String)
 
 }
 
@@ -200,7 +200,7 @@ class SimpleTraceRouteCallback : TraceRouteCallback {
 
     private var _onUpdate: ((text: String) -> Unit)? = null
 
-    private var _onFailed: ((code: Int, reason: String) -> Unit)? = null
+    private var _onFailed: ((code: Int, host: String, protocol: String, reason: String) -> Unit)? = null
 
     /**
      * wrap for onSuccess
@@ -244,7 +244,7 @@ class SimpleTraceRouteCallback : TraceRouteCallback {
      * @param code execute code. Nonzero is failure
      * @param reason Failure explanation
      */
-    fun failed(failed: (code: Int, reason: String) -> Unit) {
+    fun failed(failed: (code: Int, host: String, protocol: String, reason: String) -> Unit) {
         _onFailed = failed
     }
 
@@ -254,8 +254,8 @@ class SimpleTraceRouteCallback : TraceRouteCallback {
      * @param code execute code. Nonzero is failure
      * @param reason Failure explanation
      */
-    override fun onFailed(code: Int, reason: String) {
-        _onFailed?.invoke(code, reason)
+    override fun onFailed(code: Int, host: String, protocol: String, reason: String) {
+        _onFailed?.invoke(code, host, protocol, reason)
     }
 
 }
